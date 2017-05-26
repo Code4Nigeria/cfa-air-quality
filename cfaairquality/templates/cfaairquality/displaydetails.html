@@ -1,0 +1,86 @@
+<html>
+    <head>
+        <title>Displaying Sensor Data</title>
+
+        <META HTTP-EQUIV="refresh" CONTENT="300">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+        <style>
+            th {
+            font-size: 12px;
+        }
+        td {
+            font-size: 12px;
+        }
+        h1 {
+             padding-bottom: 1cm;
+        }
+        p {
+             padding-bottom: 0.7cm;
+        }
+        </style>
+
+    </head>
+    <body>
+        <div class="container ">
+  <h1>CodeForAfrica</h1>
+  <h2>Deatiled Information about Air quality devices </h2>
+  <p></p>
+  <div class="table-responsive" >
+  <table class="table">
+    <thead>
+      <tr>
+        <th>S/N</th>
+        <th>Sensor Name</th>
+        <th>Host city </th>
+        <th>Installed Status</th>
+        <th>In care of</th>
+        <th>Host Organisation</th>
+        <th>Host PhoneNo</th>
+        <th>Pollutants Captured</th>
+        <th>Host Country</th>
+        <th>Longitude</th>
+        <th>Latitude</th>
+        <th>Altitude</th>
+        <th>Pollutant Update Interval(secs) </th>
+        <th>Owner </th>
+        <th>Date Regstered </th>
+        <th>Date Modified</th>
+        <th>Data offset Sync</th>
+        <th>Sync Date</th>
+      </tr>
+    </thead>
+    <tbody>
+
+            {% for data in sensor_details %}
+                <tr class="info">
+                    <td>{{ data.pk }}</td>
+                    <td>{{ data.sensor_name }}</td>
+                    <td>{{ data.sensor_city }}</td>
+                    <td>{{ data.sensor_installed }}</td>
+                    <td>{{ data.sensor_incare_of }}</td>
+                    <td>{{ data.sensor_organisation }}</td>
+                    <td>{{ data.sensor_phoneno }}</td>
+                    <td>{{ data.sensor_pollutants_var }}</td>
+                    <td>{{ data.sensor_country }}</td>
+                    <td>{{ data.sensor_log }}</td>
+                    <td>{{ data.sensor_lat }}</td>
+                    <td>{{ data.sensor_height }}</td>
+                    <td>{{ data.sensor_data_interval }}</td>
+                    <td>{{ data.sensor_data_owner }}</td>
+                    <td>{{ data.sensor_created_date }}</td>
+                    <td>{{ data.sensor_modified_date }}</td>
+                    <td>{{ data.sensor_data_offset }}</td>
+                    <td>{{ data.sensor_offset_date }}</td>
+                </tr>
+            {% endfor %}
+
+    </tbody>
+  </table>
+</div>
+</div>
+
+    </body>
+</html>

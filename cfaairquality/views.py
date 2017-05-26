@@ -79,58 +79,64 @@ def input_sensor_data (request):
         former=0 # hold a random data first. it will be replaced.
         #check which of the sensors data is coming from and load appropraite object.
         try:
-            q['d']=='"1"'
+            q['d']=='1'
 
         except:
             return render (request, 'cfaairquality/sensorresponse.html', {})
 
+        if q['s'] == '1' or q['s'] == '0' : # i am debugging dont add the timing palava.
 
-        # we want to ensure the first data, data_no 1 starts at 00:00 to 00:15 on a particular day....................................................
-        #sync data timing of sensor with that of database.
-        #check if offset has been done.
-        sensor_property = SensorDetails.objects.get(pk=int(q['d'].strip('"')))
-        sync_time =sensor_property.sensor_offset_date
-        #return HttpResponse ("sync_time is %s" % sync_time)
+            # we want to ensure the first data, data_no 1 starts at 00:00 to 00:15 on a particular day....................................................
+            #sync data timing of sensor with that of database.
+            #check if offset has been done.
+            try:
+                sensor_property = SensorDetails.objects.get(pk=int(q['d'].strip('"')))
+            except:
+                return HttpResponse ("Please add sensor")
+            sync_time =sensor_property.sensor_offset_date
+            #return HttpResponse ("sync_time is %s" % sync_time)
 
-        now_time = datetime.now()
+            now_time = datetime.now()
 
-        #check if datetime corrolate to know if daily offset has been recorded.......................................................................
+            #check if datetime corrolate to know if daily offset has been recorded.......................................................................
 
-        if sync_time != None and sync_time.year == now_time.year and sync_time.month == now_time.month and sync_time.day ==now_time.day:
-            pass
+            if sync_time != None and sync_time.year == now_time.year and sync_time.month == now_time.month and sync_time.day ==now_time.day:
+                pass
+            else:
+                timelist = [15,30,45,60,115,130,145,160,215,230,245,260,315,330,345,360,415,430,445,460,515,530,545,560,615,630,645,660,715,730,745,
+                        760,815,830,845,860,915,930,945,960,1015,1030,1045,1060,1100,1115,1130,1145,1160,1215,1230,1245,1260,1315,1330,1345,1360,
+                        1415,1430,1445,1460,1515,1530,1545,1560,1615,1630,1645,1660,1715,1730,1745,1760,1815,1830,1845,1860,1915,1930,1945,1960,
+                        2015,2030,2045,2060,2115,2130,2145,2160,2215,2230,2245,2260,2315,2330,2345,2360]
+
+                #take time hrs and minuts and convert to string so you could check time
+                h=str(now_time.hour)
+                m=str(now_time.minute)
+
+                if len(h) == 1:
+                    h=str('0'+h) # because the hr and min is output as a single digit, we append 0 to it to make it work the way we want
+                if len(m) == 1:
+                    m=str('0'+m)
+
+                timedata = int(h+m) # we add up the string of hours and minutes to get something like HHMM like 1759
+
+                #return HttpResponse ("timedata is %s" % timedata)
+
+                timetracker =1
+                for times in timelist:
+                    if timedata > times:
+                        timetracker = timetracker + 1
+                    else:
+                        offset = -1 * (timetracker - int(q['dn'].strip('"'))) #q['dn'] is the data_no coming from sensor. we need to save this into a place in database so we can adjust new data with it, we negate it to get right answers for offset.
+                        correct_data_no = str (int(q['dn'].strip('"')) - offset) # update the data_no with the appropraite data no that should come in at that time.
+                        sensor_property.sensor_data_offset = offset #store the offest data into corresponding sensordetails space.
+                        sensor_property.sensor_offset_date = datetime.now() # update the new time when sensor offset has been updated, usually ocuurs once perday.
+                        #sensor_property.save() #save it. #uncomment this, only  when testing is over.
+
+
+                #return HttpResponse ("the accurate datano is %s" %correct_data_no)
+            #completed.................................................................................................................................
         else:
-            timelist = [15,30,45,60,115,130,145,160,215,230,245,260,315,330,345,360,415,430,445,460,515,530,545,560,615,630,645,660,715,730,745,
-                    760,815,830,845,860,915,930,945,960,1015,1030,1045,1060,1100,1115,1130,1145,1160,1215,1230,1245,1260,1315,1330,1345,1360,
-                    1415,1430,1445,1460,1515,1530,1545,1560,1615,1630,1645,1660,1715,1730,1745,1760,1815,1830,1845,1860,1915,1930,1945,1960,
-                    2015,2030,2045,2060,2115,2130,2145,2160,2215,2230,2245,2260,2315,2330,2345,2360]
-
-            #take time hrs and minuts and convert to string so you could check time
-            h=str(now_time.hour)
-            m=str(now_time.minute)
-
-            if len(h) == 1:
-                h=str('0'+h) # because the hr and min is output as a single digit, we append 0 to it to make it work the way we want
-            if len(m) == 1:
-                m=str('0'+m)
-
-            timedata = int(h+m) # we add up the string of hours and minutes to get something like HHMM like 1759
-
-            #return HttpResponse ("timedata is %s" % timedata)
-
-            timetracker =1
-            for times in timelist:
-                if timedata > times:
-                    timetracker = timetracker + 1
-                else:
-                    offset = -1 * (timetracker - int(q['dn'].strip('"'))) #q['dn'] is the data_no coming from sensor. we need to save this into a place in database so we can adjust new data with it, we negate it to get right answers for offset.
-                    correct_data_no = str (int(q['dn'].strip('"')) - offset) # update the data_no with the appropraite data no that should come in at that time.
-                    sensor_property.sensor_data_offset = offset #store the offest data into corresponding sensordetails space.
-                    sensor_property.sensor_offset_date = datetime.now() # update the new time when sensor offset has been updated, usually ocuurs once perday.
-
-
-            #return HttpResponse ("the accurate datano is %s" %correct_data_no)
-        #completed.................................................................................................................................
-
+            correct_data_no = q['dn'] #for debugging purpose only, so that you can run through data number 1 to 96, remove this else and correspoding if, when set
 
 
         #check the time, we want to assign the first sensor data between 0000 to 0015 to data_no 1, even if the data_no of the reading coming at that point might not be 1
@@ -140,30 +146,30 @@ def input_sensor_data (request):
         #Check if we have offset. offset is stored in the sensordetails corresponding to the sensor, and it is updated once a day at 00:00-00:15
         #then assign data_no to 1. i.e hold.data_no = data_no - offset.
 
-        if q['d']=='"1"':
+        if q['d']=='1':
             hold = Sensor1Data() #instatiate the Sensor1Data object to hold new data to be processed, but dont save to database yet.
             former =Sensor1Data #assign the class to the name 'former' so that we can get data aleady in database
             #return HttpResponse ("what the fuck 1 %s" % str(former.objects.all()))
             hold.sensor_details = SensorDetails.objects.get(pk=int(q['d'].strip('"'))) # Assign the sensordetails instance to it.
 
-        elif q['d']=='"2"':
+        elif q['d']=='2':
             hold = Sensor2Data()
             former =Sensor2Data
            # return HttpResponse ("what the fuck 2 error %s" % str(former.objects.all()))
             hold.sensor_details = SensorDetails.objects.get(pk=int(q['d'].strip('"'))) # Assign the sensordetails instance to it.
 
-        elif q['d']=='"3"':
+        elif q['d']=='3':
             hold = Sensor3Data()
             former =Sensor3Data
            # return HttpResponse ("what the fuck 3 error %s" % str(former.objects.all()))
             hold.sensor_details = SensorDetails.objects.get(pk=int(q['d'].strip('"'))) # Assign the sensordetails instance to it.
-        elif q['d']=='"4"':
+        elif q['d']=='4':
             hold= Sensor4Data()
             former =Sensor4Data
            # return HttpResponse ("what the fuck 4 error %s" % str(former.objects.all()))
             hold.sensor_details = SensorDetails.objects.get(pk=int(q['d'].strip('"'))) # Assign the sensordetails instance to it.
         else:
-            return HttpResponse ("i didnt go through any if, what a surprise %s" % q['d'])
+            return HttpResponse ("Please add sensor:" % q['d'])
 
         #check for data_no, to know when to calculate IAQI's, typically calculate IAQI & AQI every hour i.e data_no multiple of 4
         #PM is every 24hrs
@@ -215,6 +221,7 @@ def input_sensor_data (request):
         hold.aqi_data='f'
 
         #hold.save()
+        #return HttpResponse ("i saved")
         #return HttpResponse ("what the fuck error %s" % hold.aqi_data) #has pk =sensor_details_id, then has a sensor_details, wich is a foreign object
         #SensorDetails.objects.get(pk=int(q['d'].strip('"'))).sensor_phoneno
         #return HttpResponse ("what the fuck error %s" % hold.sensor_details_id )
@@ -223,7 +230,7 @@ def input_sensor_data (request):
         k=int(hold.data_no.strip('"'))
         time_to_calculate_aqi_in_secs = 3600 # calculate AQI every hour.
         if (j*k)/(k/(time_to_calculate_aqi_in_secs/j)) == time_to_calculate_aqi_in_secs: # Every 15mins.
-
+            #return HttpResponse ("i got here %s" % hold.data_no)
             #ave1=0  ave2=0  ave3=0 #Hold freshly calculated values of averages
             data1=[]
 
@@ -255,7 +262,7 @@ def input_sensor_data (request):
             #get last inserted ID and get all data from last inserted ID,ID-1,ID-2 then add to the current Data and get avergae.
         if (int(hold.data_no.strip('"')) % 4 == 0): #fetch '3' data
             #notneeded1#last_data = former.objects.latest('pk').pk # Model.objects.filter().latest('pk') work fine with ordered list,like primary key. 43,42,41: (43-41)=2
-            #return HttpResponse ("i got here %s" % last_data)
+            #return HttpResponse ("i got here %s" % hold.data_no)
             u = former.objects.all().order_by('-id')[:(int(hold.data_no.strip('"'))-1)] # pull the pk of last n-1 data.
             #notneeded2#for i in range ((last_data - (int(hold.data_no.strip('"'))- 2)), (last_data + 1)): #take 3 other data above the last data in database. (the 2 + 1 indicates we are taking 3), we can increase 2 to take more data, but the 1 is constant.
             for i in u: #take the primary keys
@@ -286,7 +293,7 @@ def input_sensor_data (request):
 
             #check if you already have a nowcast, so that you can calculate it. After you got the first value.
 
-            if hold.data_no =='"32"' or hold.data_no =='"64"' or hold.data_no=='"96"': #fetch 31 data for CO
+            if hold.data_no =='32' or hold.data_no =='64' or hold.data_no=='96': #fetch 31 data for CO
                 #last_data = former.objects.latest('pk').pk # Model.objects.filter().latest('pk') work fine with ordered list,like primary key. 43,42,41: (43-41)=2
                 u = former.objects.all().order_by('-id')[:(int(hold.data_no.strip('"'))-1)] # pull the pk of last n-1 data.
                 #for i in range ((last_data - (int(hold.data_no.strip('"'))- 2)), (last_data + 1)): #take 3 other data above the last data in database. (the 30 + 1 indicates we are taking 31), we can increase 2 to take more data, but the 1 is constant.
@@ -365,7 +372,7 @@ def input_sensor_data (request):
                 calpm25nowcast= True
                 calaqi= True
 
-            if hold.data_no == '"96"': #fetch 95 data
+            if hold.data_no == '96': #fetch 95 data
                 #last_data = former.objects.latest('pk').pk # Model.objects.filter().latest('pk') work fine with ordered list,like primary key. 43,42,41: (43-41)=2
                 u = former.objects.all().order_by('-id')[:(int(hold.data_no.strip('"'))-1)] # pull the pk of last n-1 data.
                 #for i in range ((last_data - (int(hold.data_no.strip('"'))- 2)), (last_data + 1)): #take 3 other data above the last data in database. (the 94 + 1 indicates we are taking 95), we can increase 2 to take more data, but the 1 is constant.
@@ -391,11 +398,19 @@ def input_sensor_data (request):
                 calaqi= True
 
             if calaqi==False:
-                hold.save() #save the 15 mins data
+                try:
+                    hold.save() #save the 15 mins data
+                except:
+                    return HttpResponse ("didnt save to database 1st" )
+
                 return HttpResponse ("Saved 15 mins data which pass the 3600 and 4's mulitple." )
 
         else:
-            hold.save() #save the 15 mins data
+            try:
+                hold.save() #save the 15 mins data
+            except:
+                return HttpResponse ("didnt save to database 2nd" )
+
             return HttpResponse ("Saved 15 mins data which pass the 3600 but not 4's mulitple." )
 
         if calaqi==True :
@@ -439,7 +454,7 @@ def input_sensor_data (request):
                 aqi_data=0
 
                 if float(hold.co_8hr_ave.strip('"')) > 50.4:
-                    hold.co_iaqi= "500"
+                    hold.co_iaqi= 500
                 else:
                     for breakpoint in CO_breakpoint_for_c:
                         if breakpoint[0] <= float(hold.co_8hr_ave.strip('"')) <= breakpoint[1]:
@@ -450,12 +465,12 @@ def input_sensor_data (request):
                             hold.co_iaqi =(((IH-IL)/(CH-CL))*(float(hold.co_8hr_ave.strip('"'))-CL))+IL
 
 
-                            if hold.co_iaqi>aqi_data:
-                                aqi_data=str(hold.co_iaqi)
+                            if float(hold.co_iaqi)>aqi_data:
+                                aqi_data=hold.co_iaqi
 
                 if calpm25iaqi== True:
                     if float(hold.pm25_24hr_ave.strip('"')) > 500.4:
-                        hold.pm25_iaqi= "500"
+                        hold.pm25_iaqi= 500
                     else:
                         for breakpoint in pm25_breakpoint_for_c:
                             if breakpoint[0] <= float(hold.pm25_24hr_ave.strip('"')) <= breakpoint[1]:
@@ -465,12 +480,12 @@ def input_sensor_data (request):
                                 IH = breakpoint[3]
                                 hold.pm25_iaqi = (((IH-IL)/(CH-CL))*(float(hold.pm25_24hr_ave.strip('"'))-CL))+IL
 
-                                if hold.pm25_iaqi>aqi_data:
-                                    aqi_data=str(hold.co_iaqi)
+                                if float (hold.pm25_iaqi)>aqi_data:
+                                    aqi_data=hold.pm25_iaqi
 
                 if calpm10iaqi== True:
                     if float(hold.pm10_24hr_ave.strip('"')) > 604:
-                        hold.pm10_iaqi= "500"
+                        hold.pm10_iaqi= 500
                     else:
                         for breakpoint in pm10_breakpoint_for_c:
                             if breakpoint[0] <= float(hold.pm10_24hr_ave.strip('"')) <= breakpoint[1]:
@@ -479,12 +494,12 @@ def input_sensor_data (request):
                                 IL = breakpoint[2]
                                 IH = breakpoint[3]
                                 hold.pm10_iaqi = (((IH-IL)/(CH-CL))*(float(hold.pm10_24hr_ave.strip('"'))-CL))+IL
-                                if hold.pm10_iaqi>aqi_data:
-                                    aqi_data=str(hold.co_iaqi)
+                                if float(hold.pm10_iaqi)>aqi_data:
+                                    aqi_data=hold.pm10_iaqi
 
                 if calpm10nowcast== True:
                     if float(hold.pm_nowcast10.strip('"')) > 604:
-                        temp1_pm_nowcast10= "500"
+                        temp1_pm_nowcast10= 500
                     else:
                         for breakpoint in pm10_breakpoint_for_c:
                             if breakpoint[0] <= float(hold.pm_nowcast10.strip('"')) <= breakpoint[1]:
@@ -494,11 +509,11 @@ def input_sensor_data (request):
                                 IH = breakpoint[3]
                                 temp1_pm_nowcast10 = (((IH-IL)/(CH-CL))*(float(hold.pm_nowcast10.strip('"'))-CL))+IL
                                 if temp1_pm_nowcast10>aqi_data:
-                                    aqi_data=str(temp1_pm_nowcast10)
+                                    aqi_data=temp1_pm_nowcast10
 
                 if calpm25nowcast== True:
                     if float(hold.pm_nowcast25.strip('"')) > 500.4:
-                        temp2_pm_nowcast25= "500"
+                        temp2_pm_nowcast25= 500
                     else:
                         for breakpoint in pm25_breakpoint_for_c:
                             if breakpoint[0] <= float(hold.pm_nowcast25.strip('"')) <= breakpoint[1]:
@@ -508,7 +523,7 @@ def input_sensor_data (request):
                                 IH = breakpoint[3]
                                 temp2_pm_nowcast25 = (((IH-IL)/(CH-CL))*(float(hold.pm_nowcast25.strip('"'))-CL))+IL
                                 if temp2_pm_nowcast25>aqi_data:
-                                    aqi_data=str(temp2_pm_nowcast25)
+                                    aqi_data=temp2_pm_nowcast25
 
                 #get highest AQI number and make overall AQI.
 
@@ -530,29 +545,16 @@ def input_sensor_data (request):
         return HttpResponse ("Which type of request is this " )
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def output_data (request):
     sensor_data = Sensor1Data.objects.all()
     return render (request, 'cfaairquality/displaytable.html', {'sensor_data':sensor_data})
 
+def output_sensors_details (request):
+    sensor_details = SensorDetails.objects.all()
+    return render (request, 'cfaairquality/displaydetails.html', {'sensor_details':sensor_details})
+
 def get_aqi_data (request):
+    #get the dateandtime, when request came in.
     sensor_aqi = Sensor1Data.objects.get(pk=136)
     #data= serializers.serialize("json", [sensor_aqi]), content_type="application/json")
     data= serializers.serialize("json", [sensor_aqi,])
@@ -566,7 +568,7 @@ def get_aqi_data1(request):
     if request.GET(): #os request.GET()
         sensor_aqi = Sensor1Data.objects.get(pk=136)
         #data= serializers.serialize("json", [sensor_aqi]), content_type="application/json")
-        data= serializers.serialize("json", [sensor_aqi,])
+        data= serializers.serialize("json", [sensor_aqi,]) #[] to select only the first vale, should be remove when you need to send all objects
         data2=json.loads(data)
         data = json.dumps(data2[0])
         return JsonResponse(data)
