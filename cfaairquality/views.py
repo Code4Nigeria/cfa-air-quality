@@ -104,7 +104,7 @@ def input_sensor_data (request):
                 pass
             else:
                 timelist = [15,30,45,60,115,130,145,160,215,230,245,260,315,330,345,360,415,430,445,460,515,530,545,560,615,630,645,660,715,730,745,
-                        760,815,830,845,860,915,930,945,960,1015,1030,1045,1060,1100,1115,1130,1145,1160,1215,1230,1245,1260,1315,1330,1345,1360,
+                        760,815,830,845,860,915,930,945,960,1015,1030,1045,1060,1115,1130,1145,1160,1215,1230,1245,1260,1315,1330,1345,1360,
                         1415,1430,1445,1460,1515,1530,1545,1560,1615,1630,1645,1660,1715,1730,1745,1760,1815,1830,1845,1860,1915,1930,1945,1960,
                         2015,2030,2045,2060,2115,2130,2145,2160,2215,2230,2245,2260,2315,2330,2345,2360]
 
@@ -220,6 +220,14 @@ def input_sensor_data (request):
         #AQI
         hold.aqi_data='f'
 
+        #let us know which AQi to calculate.
+        calcoiaqi= False
+        calpm25iaqi= False
+        calpm10iaqi= False
+        calpm10nowcast= False
+        calpm25nowcast= False
+        calaqi= False
+
         #hold.save()
         #return HttpResponse ("i saved")
         #return HttpResponse ("what the fuck error %s" % hold.aqi_data) #has pk =sensor_details_id, then has a sensor_details, wich is a foreign object
@@ -236,14 +244,6 @@ def input_sensor_data (request):
 
             data2=[]
             data3=[]#Hold data extract from database
-
-            #let us know which AQi to calculate.
-            calcoiaqi= False
-            calpm25iaqi= False
-            calpm10iaqi= False
-            calpm10nowcast= False
-            calpm25nowcast= False
-            calaqi= False
 
             #we need to average PM2.5 and PM10 data every 1hour, 12hrs and 24hrs. i.e since our interval is 15 mins, every 4th readings.
             #for 1 hr  we need to pull out the last X data, where X=3 if we want to average over 1 hr i.e when data_no is multiple of   4:1*4
@@ -277,19 +277,11 @@ def input_sensor_data (request):
             data3=[float(x.strip('"')) for x in data3] #convert them to float
             #hourly average
             hold.co_hr_ave= str(sum(data3)/len(data3))
-            hold.o3_hr_ave= '0'
-            hold.no2_hr_ave= '0'
+            hold.o3_hr_ave= 'p'
+            hold.no2_hr_ave= 'p'
             hold.pm25_hr_ave= str(sum(data1)/len(data1))
             hold.pm10_hr_ave= str(sum(data2)/len(data2))
-            hold.so2_hr_ave= '0'
-            #calculate AQI
-            calcoiaqi= False
-            calpm25iaqi= False
-            calpm10iaqi= False
-            calpm10nowcast= False
-            calpm25nowcast= False
-            calaqi= False
-
+            hold.so2_hr_ave= 'p'
 
             #check if you already have a nowcast, so that you can calculate it. After you got the first value.
 
@@ -304,14 +296,10 @@ def input_sensor_data (request):
                     data3=[float(x.strip('"')) for x in data3] #convert them to float
                     #8hours-average
                 hold.co_8hr_ave= str(sum(data3)/len(data3))
-                hold.o3_8hr_ave= '0'
-                hold.so2_8hr_ave= '0'
+                hold.o3_8hr_ave= 'a'
+                hold.so2_8hr_ave= 'a'
                 #caclate AQI
                 calcoiaqi= True
-                calpm25iaqi= False
-                calpm10iaqi= False
-                calpm10nowcast= False
-                calpm25nowcast= False
                 calaqi= True
 
 
@@ -365,9 +353,6 @@ def input_sensor_data (request):
                     hold.pm_nowcast10= str(sum(datan))
                     #hold.pm_nowcast25= sum(data2)/len(data2)
 
-                calcoiaqi= False
-                calpm25iaqi= False
-                calpm10iaqi= False
                 calpm10nowcast= True
                 calpm25nowcast= True
                 calaqi= True
@@ -387,14 +372,11 @@ def input_sensor_data (request):
                 data2=[float(str(x).strip('"')) for x in data2] #convert them to float
                 data3=[float(str(x).strip('"')) for x in data3] #convert them to float
                 #24 hours average.
-                hold.so2_24hr_ave= '0'
+                hold.so2_24hr_ave= 'y'
                 hold.pm25_24hr_ave= str(sum(data1)/len(data1))
                 hold.pm10_24hr_ave= str(sum(data2)/len(data2))
-                calcoiaqi= False
                 calpm25iaqi= True
                 calpm10iaqi= True
-                calpm10nowcast= False
-                calpm25nowcast= False
                 calaqi= True
 
             if calaqi==False:
@@ -403,7 +385,7 @@ def input_sensor_data (request):
                 except:
                     return HttpResponse ("didnt save to database 1st" )
 
-                return HttpResponse ("Saved 15 mins data which pass the 3600 and 4's mulitple." )
+                return HttpResponse ("Hourly average added" )
 
         else:
             try:
@@ -411,7 +393,7 @@ def input_sensor_data (request):
             except:
                 return HttpResponse ("didnt save to database 2nd" )
 
-            return HttpResponse ("Saved 15 mins data which pass the 3600 but not 4's mulitple." )
+            return HttpResponse ("15mins average data added" )
 
         if calaqi==True :
             #PM2.5 Breakpoint Conceentration C_low & C_high and corresponding AQI for C over a 24 hrs average.
@@ -449,7 +431,7 @@ def input_sensor_data (request):
 
 
             if calcoiaqi ==True:
-                temp2_pm_nowcast25=0
+                temp1_pm_nowcast10=0
                 temp2_pm_nowcast25=0
                 aqi_data=0
 
@@ -530,11 +512,11 @@ def input_sensor_data (request):
                 hold.aqi_data= aqi_data
 
             hold.save()
-            return HttpResponse ("Saved 15 mins data which pass the 3600 and 4's mulitple and calculated AQI" )
+            return HttpResponse ("Hourly data added and calculated AQI" )
 
         else:
             hold.save()
-            return HttpResponse ("Saved 15 mins data which pass the 3600 and 4's mulitple but AQI not calculated" )
+            return HttpResponse ("Hourly data added but no AQI calculated" )
 
         #very important to get GMT time and in string.  from time import gmtime, strftime
         #strftime("%Y-%m-%d %H:%M:%S", gmtime())
@@ -585,4 +567,3 @@ def remotely_control_sensor (request):
 #APIs to get sensor information from this platform
 def json_data_sensor (request):
     return render (request, 'cfaairquality/introduction.html', {})
-
