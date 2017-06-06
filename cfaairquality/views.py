@@ -1,6 +1,7 @@
 from django.shortcuts import render
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+from django.utils import timezone
 from django.http import JsonResponse
 from django.core import serializers
 from django.http import HttpResponse
@@ -9,6 +10,8 @@ from .models import Sensor1Data
 from .models import Sensor2Data
 from .models import Sensor3Data
 from .models import Sensor4Data
+from .activesensor import activesensor
+from .datacleanser import converter
 
 # Create your views here.
 
@@ -84,7 +87,7 @@ def input_sensor_data (request):
         except:
             return render (request, 'cfaairquality/sensorresponse.html', {})
 
-        if q['s'] == '1' or q['s'] == '0' : # i am debugging dont add the timing palava.
+        if q['s'] == '12' or q['s'] == '50' : # i am debugging dont add the timing palava.
 
             # we want to ensure the first data, data_no 1 starts at 00:00 to 00:15 on a particular day....................................................
             #sync data timing of sensor with that of database.
@@ -193,32 +196,32 @@ def input_sensor_data (request):
         hold.data_no= correct_data_no #ensure that this data when its 1, syncs with 12.00-12:15am
         hold.data_int=q['di']
         #hourly average
-        hold.co_hr_ave= '0'
-        hold.o3_hr_ave= '0'
-        hold.no2_hr_ave= '0'
-        hold.pm25_hr_ave= '0'
-        hold.pm10_hr_ave= '0'
-        hold.so2_hr_ave= '0'
+        hold.co_hr_ave= 'x'
+        hold.o3_hr_ave= 'x'
+        hold.no2_hr_ave= 'x'
+        hold.pm25_hr_ave= 'x'
+        hold.pm10_hr_ave= 'x'
+        hold.so2_hr_ave= 'x'
         #8hours-average
-        hold.co_8hr_ave= '0'
-        hold.o3_8hr_ave= '0'
-        hold.so2_8hr_ave= '0'
+        hold.co_8hr_ave= 'x'
+        hold.o3_8hr_ave= 'x'
+        hold.so2_8hr_ave= 'x'
         #24 hours average.
-        hold.so2_24hr_ave= '0'
-        hold.pm25_24hr_ave= '0'
-        hold.pm10_24hr_ave= '0'
+        hold.so2_24hr_ave= 'x'
+        hold.pm25_24hr_ave= 'x'
+        hold.pm10_24hr_ave= 'x'
         #Nowcast
-        hold.pm_nowcast25= '0'
-        hold.pm_nowcast10='0'
+        hold.pm_nowcast25= 'x'
+        hold.pm_nowcast10='x'
         #IAQI
-        hold.co_iaqi='0'
-        hold.o3_iaqi='0'
-        hold.no2_iaqi='0'
-        hold.pm25_iaqi='0'
-        hold.pm10_iaqi='0'
-        hold.so2_iaqi='0'
+        hold.co_iaqi='x'
+        hold.o3_iaqi='x'
+        hold.no2_iaqi='x'
+        hold.pm25_iaqi='x'
+        hold.pm10_iaqi='x'
+        hold.so2_iaqi='x'
         #AQI
-        hold.aqi_data='f'
+        hold.aqi_data='x'
 
         #let us know which AQi to calculate.
         calcoiaqi= False
@@ -263,7 +266,9 @@ def input_sensor_data (request):
         if (int(hold.data_no.strip('"')) % 4 == 0): #fetch '3' data
             #notneeded1#last_data = former.objects.latest('pk').pk # Model.objects.filter().latest('pk') work fine with ordered list,like primary key. 43,42,41: (43-41)=2
             #return HttpResponse ("i got here %s" % hold.data_no)
-            u = former.objects.all().order_by('-id')[:(int(hold.data_no.strip('"'))-1)] # pull the pk of last n-1 data.
+            start_date = timezone.now().date() #date is always saved in UTC in database, so you need to do this to get correct figures
+            end_date = start_date + timedelta( days=1 )
+            u = former.objects.filter(created_date__range=(start_date,end_date )).order_by('-id')[:(int(hold.data_no.strip('"'))-1)] # pull the pk of last n-1 data.
             #notneeded2#for i in range ((last_data - (int(hold.data_no.strip('"'))- 2)), (last_data + 1)): #take 3 other data above the last data in database. (the 2 + 1 indicates we are taking 3), we can increase 2 to take more data, but the 1 is constant.
             for i in u: #take the primary keys
                 data1.append(former.objects.get(pk=i.pk).pm25_data) #add all the data you just got from the database into a list
@@ -287,7 +292,9 @@ def input_sensor_data (request):
 
             if hold.data_no =='32' or hold.data_no =='64' or hold.data_no=='96': #fetch 31 data for CO
                 #last_data = former.objects.latest('pk').pk # Model.objects.filter().latest('pk') work fine with ordered list,like primary key. 43,42,41: (43-41)=2
-                u = former.objects.all().order_by('-id')[:(int(hold.data_no.strip('"'))-1)] # pull the pk of last n-1 data.
+                start_date = timezone.now().date() #date is always saved in UTC in database, so you need to do this to get correct figures
+                end_date = start_date + timedelta( days=1 )
+                u = former.objects.filter(created_date__range=(start_date,end_date )).order_by('-id')[:(int(hold.data_no.strip('"'))-1)] # pull the pk of last n-1 data.
                 #for i in range ((last_data - (int(hold.data_no.strip('"'))- 2)), (last_data + 1)): #take 3 other data above the last data in database. (the 30 + 1 indicates we are taking 31), we can increase 2 to take more data, but the 1 is constant.
                 for i in u: #take the primary keys
                     data3.append(former.objects.get(pk=i.pk).co_data) #add all the data you just got from the database into a list
@@ -307,49 +314,66 @@ def input_sensor_data (request):
                 #last_data = former.objects.latest('pk').pk # Model.objects.filter().latest('pk') work fine with ordered list,like primary key. 43,42,41: (43-41)=2
                 #data1.append(former.objects.get(pk=(last_data - (int(hold.data_no.strip('"'))- 2))).pm25_data) #add all the data you just got from the database into a list
                 #data2.append(former.objects.get(pk=(last_data - (int(hold.data_no.strip('"'))- 2))).pm10_data) #add all the data you just got from the database into a list
-                u = former.objects.all().order_by('-id')[:(int(hold.data_no.strip('"'))-1)] # pull the pk of last n-1 data.
+
+                start_date = timezone.now().date() #date is always saved in UTC in database, so you need to do this to get correct figures
+                end_date = start_date + timedelta( days=1 ) #will not include this date
+                u = former.objects.filter(created_date__range=(start_date,end_date )).exclude(pm10_hr_ave='x', pm25_hr_ave='x').order_by('-id')[:(int(hold.data_no.strip('"'))-1)] # pull the pk of last n-1 data.
                 #for i in range ((last_data - (int(hold.data_no.strip('"'))- 2) + 4), (last_data + 1), 4): # Here i am taking interval of 4 i.e: 8, 12, 16. so the formulashould givefor i in range(1+4,48,4), print(i-1), after the loop which ends 48                    data1.append(former.objects.get(pk=(i-1)).pm25_data) #add all the data you just got from the database into a list
+
                 for i in u: #take the primary keys
                     data1.append(former.objects.get(pk=i.pk).pm25_hr_ave) #add all the data you just got from the database into a list
                     data2.append(former.objects.get(pk=i.pk).pm10_hr_ave) #add all the data you just got from the database into a list
+
                 data1.append(q['p2']) #add the latest pm25_data data coming in which is the 48th data
                 data2.append(q['p1']) #add the latest pm25_data data coming in which is the 48th data
                 data1=[str(x) for x in data1] #convert them to float
-                data2=[str(x) for x in data2] #convert them to float
+                data2=[str(x) for x in data2] #convert them to float isinstance(x, int)
+
+
+
+                data1=[converter(x) for x in data1] #convert 'x' to zero for calculation's sake
+                data2=[converter(x) for x in data2]
+
 
                 data1=[float(x.strip('"')) for x in data1] #convert them to float
                 data2=[float(x.strip('"')) for x in data2] #convert them to float
+
+
                 #Nowcast
                 #find the Max and Min
                 w25=min(data1)/max(data1)
                 w10=min(data2)/max(data2)
+
                 if w25 > 0.5:
                     datan=[]
                     dataw=[]
-                    for i in range (1,13):
-                        datan.append((w25**i) * data1[i-1])
+                    for i in range (1,len(data1)+1):
+                        datan.append((w25**i) * data1[i-1]) #
                         dataw.append(w25**i)
+
                     hold.pm_nowcast25= str(sum(datan)/sum(dataw))
+
                 elif w25 <= 0.5:
                     w25=0.5
                     datan=[]
                     dataw=[]
-                    for i in range (1,13):
+                    for i in range (1,len(data1)+1):
                         datan.append((w25**i) * data1[i-1])
                     hold.pm_nowcast25= str(sum(datan))
                 if w10 > 0.5:
                     datan=[]
                     dataw=[]
-                    for i in range (1,13):
-                        datan.append((w10**i) * data1[i-1])
+                    for i in range (1,len(data2)+1):
+                        datan.append((w10**i) * data2[i-1])
                         dataw.append(w10**i)
                     hold.pm_nowcast10= str(sum(datan)/sum(dataw))
+
                 elif w10 <= 0.5:
-                    w25=0.5
+                    w10=0.5
                     datan=[]
                     dataw=[]
-                    for i in range (1,13):
-                        datan.append((w10**i) * data1[i-1])
+                    for i in range (1,len(data2)+1):
+                        datan.append((w10**i) * data2[i-1])
                     hold.pm_nowcast10= str(sum(datan))
                     #hold.pm_nowcast25= sum(data2)/len(data2)
 
@@ -359,7 +383,7 @@ def input_sensor_data (request):
 
             if hold.data_no == '96': #fetch 95 data
                 #last_data = former.objects.latest('pk').pk # Model.objects.filter().latest('pk') work fine with ordered list,like primary key. 43,42,41: (43-41)=2
-                u = former.objects.all().order_by('-id')[:(int(hold.data_no.strip('"'))-1)] # pull the pk of last n-1 data.
+                u = former.objects.filter(created_date__day=datetime.now().day).order_by('-id')[:(int(hold.data_no.strip('"'))-1)] # pull the pk of last n-1 data.
                 #for i in range ((last_data - (int(hold.data_no.strip('"'))- 2)), (last_data + 1)): #take 3 other data above the last data in database. (the 94 + 1 indicates we are taking 95), we can increase 2 to take more data, but the 1 is constant.
                 for i in u: #take the primary keys
                     data1.append(former.objects.get(pk=i.pk).pm25_data) #add all the data you just got from the database into a list
@@ -430,25 +454,26 @@ def input_sensor_data (request):
             # IL = the index breakpoint corresponding to C_low
 
 
-            if calcoiaqi ==True:
-                temp1_pm_nowcast10=0
-                temp2_pm_nowcast25=0
+            if calaqi ==True: #calculate AQI only if time is greater data is 48 and time > , activate in production
+               # temp1_pm_nowcast10=0
+               # temp2_pm_nowcast25=0
                 aqi_data=0
 
-                if float(hold.co_8hr_ave.strip('"')) > 50.4:
-                    hold.co_iaqi= 500
-                else:
-                    for breakpoint in CO_breakpoint_for_c:
-                        if breakpoint[0] <= float(hold.co_8hr_ave.strip('"')) <= breakpoint[1]:
-                            CL = breakpoint[0]
-                            CH = breakpoint[1]
-                            IL = breakpoint[2]
-                            IH = breakpoint[3]
-                            hold.co_iaqi =(((IH-IL)/(CH-CL))*(float(hold.co_8hr_ave.strip('"'))-CL))+IL
+                if calcoiaqi==True:
+                    if float(hold.co_8hr_ave.strip('"')) > 50.4:
+                        hold.co_iaqi= 500
+                    else:
+                        for breakpoint in CO_breakpoint_for_c:
+                            if breakpoint[0] <= float(hold.co_8hr_ave.strip('"')) <= breakpoint[1]:
+                                CL = breakpoint[0]
+                                CH = breakpoint[1]
+                                IL = breakpoint[2]
+                                IH = breakpoint[3]
+                                hold.co_iaqi =(((IH-IL)/(CH-CL))*(float(hold.co_8hr_ave.strip('"'))-CL))+IL
 
 
-                            if float(hold.co_iaqi)>aqi_data:
-                                aqi_data=hold.co_iaqi
+                                if float(hold.co_iaqi)>aqi_data:
+                                    aqi_data=hold.co_iaqi
 
                 if calpm25iaqi== True:
                     if float(hold.pm25_24hr_ave.strip('"')) > 500.4:
@@ -481,7 +506,7 @@ def input_sensor_data (request):
 
                 if calpm10nowcast== True:
                     if float(hold.pm_nowcast10.strip('"')) > 604:
-                        temp1_pm_nowcast10= 500
+                        hold.pm10_iaqi= 500
                     else:
                         for breakpoint in pm10_breakpoint_for_c:
                             if breakpoint[0] <= float(hold.pm_nowcast10.strip('"')) <= breakpoint[1]:
@@ -489,13 +514,13 @@ def input_sensor_data (request):
                                 CH = breakpoint[1]
                                 IL = breakpoint[2]
                                 IH = breakpoint[3]
-                                temp1_pm_nowcast10 = (((IH-IL)/(CH-CL))*(float(hold.pm_nowcast10.strip('"'))-CL))+IL
-                                if temp1_pm_nowcast10>aqi_data:
-                                    aqi_data=temp1_pm_nowcast10
+                                hold.pm10_iaqi = (((IH-IL)/(CH-CL))*(float(hold.pm_nowcast10.strip('"'))-CL))+IL
+                                if hold.pm10_iaqi>aqi_data:
+                                    aqi_data=hold.pm10_iaqi
 
                 if calpm25nowcast== True:
                     if float(hold.pm_nowcast25.strip('"')) > 500.4:
-                        temp2_pm_nowcast25= 500
+                        hold.pm25_iaqi= 500
                     else:
                         for breakpoint in pm25_breakpoint_for_c:
                             if breakpoint[0] <= float(hold.pm_nowcast25.strip('"')) <= breakpoint[1]:
@@ -503,13 +528,13 @@ def input_sensor_data (request):
                                 CH = breakpoint[1]
                                 IL = breakpoint[2]
                                 IH = breakpoint[3]
-                                temp2_pm_nowcast25 = (((IH-IL)/(CH-CL))*(float(hold.pm_nowcast25.strip('"'))-CL))+IL
-                                if temp2_pm_nowcast25>aqi_data:
-                                    aqi_data=temp2_pm_nowcast25
+                                hold.pm25_iaqi = (((IH-IL)/(CH-CL))*(float(hold.pm_nowcast25.strip('"'))-CL))+IL
+                                if hold.pm25_iaqi>aqi_data:
+                                    aqi_data=hold.pm25_iaqi
 
                 #get highest AQI number and make overall AQI.
 
-                hold.aqi_data= aqi_data
+                hold.aqi_data= round (aqi_data)
 
             hold.save()
             return HttpResponse ("Hourly data added and calculated AQI" )
@@ -535,15 +560,16 @@ def output_sensors_details (request):
     sensor_details = SensorDetails.objects.all()
     return render (request, 'cfaairquality/displaydetails.html', {'sensor_details':sensor_details})
 
-def get_aqi_data (request):
-    #get the dateandtime, when request came in.
-    sensor_aqi = Sensor1Data.objects.get(pk=136)
-    #data= serializers.serialize("json", [sensor_aqi]), content_type="application/json")
+def get_aqi_data (request, sensor_id):
+    #get the dateandtime, when request came in. get the aqi between
+    #start_time =
+    #get correct sensor from a list of sensors based oon the senor_id
+    sensor_aqi = activesensor[int(sensor_id)].objects.get()
     data= serializers.serialize("json", [sensor_aqi,])
     data2=json.loads(data)
-    data = json.dumps(data2[0])
+    data=json.dumps(data2[0])
     return HttpResponse(data, content_type="application/json")
-    #return HttpResponse(serializers.serialize("json", [sensor_aqi]), content_type="application/json")
+
 
 # Ajax call
 def get_aqi_data1(request):
