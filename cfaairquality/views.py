@@ -659,6 +659,7 @@ def get_last_ave (request, sensor_id): #Get the average of each pollutant data t
             string_date =request.GET['d']
             now_time = datetime.strptime(string_date, "%Y-%m-%d %H:%M:%S")
             start_date = now_time
+
     except:
         start_date = now_time
 
@@ -675,20 +676,27 @@ def get_last_ave (request, sensor_id): #Get the average of each pollutant data t
     if len(m) == 1:
         m=str('0'+m)
     timedata = int(h+m) # we add up the string of hours and minutes to get something like HHMM like 1759
+    timedata = 15 * int (timedata/15)    #Because we need to make time tracker only capture data in the 15 mins interval, we need to ensure that time that dosent fall in interval of 15 are set to the oldest 15 mins interval
     # Automatically find the hours of the day when request is coming and see if we have an AQI or NowCast
-    timetracker =1
+    timetracker = 1
     for times in timelist:
         if timedata > times:
             timetracker = timetracker + 1
         else:
             try:
-                if timetracker == 1: # we are receiving request from a new data for average we are yet to have. then we report the average of the last data we got yesterday, i.e 96 and change the date to yesterday
+                if timetracker == 1 and start_date.date() != datetime.now().date(): # we are receiving request from a new day for average we are yet to have. then we report the average of the last data we got yesterday, i.e 96 and change the date to yesterday
                     end_date = start_date.date() #date is always saved in UTC in database, so you need to do this to get correct figures
                     start_date = start_date.date() - timedelta( days=1 )
                     timetracker = 96
+                    return HttpResponse ("got1 here %s" %timetracker)
+                elif timetracker == 1: # we are receiving request today for average we have calulated
+                    start_date = start_date.date() #date is always saved in UTC in database, so you need to do this to get correct figures
+                    end_date = start_date + timedelta( days=1 )
+                    return HttpResponse ("got2 here %s" %timetracker)
                 elif timetracker !=1:
                     start_date = start_date.date() #date is always saved in UTC in database, so you need to do this to get correct figures
                     end_date = start_date + timedelta( days=1 )
+                    return HttpResponse ("got3 here %s" %timetracker)
                 sensor_aqi = sensor_select.objects.get(created_date__range=(start_date,end_date ), data_no =str(timetracker))
             except:
                 return HttpResponse ("No last avergae found")
