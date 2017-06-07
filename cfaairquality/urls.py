@@ -10,6 +10,6 @@ urlpatterns = [
     url(r'^output_data/$', views.output_data, name='output_data'),
     url(r'^output_sensors_details/$', views.output_sensors_details, name='output_sensors_details'),
     url(r'^get_aqi_data/(?P<sensor_id>[0-9]+)/$', views.get_aqi_data, name='get_aqi_data'),
-    url(r'^get_aqi_data1/$', views.get_aqi_data, name='get_aqi_data'),
+    url(r'^get_last_ave/(?P<sensor_id>[0-9]+)/$', views.get_last_ave, name='get_last_ave'),
     url(r'^get_aqi_data2/$', views.get_aqi_data2, name='get_aqi_data2'),
 ]

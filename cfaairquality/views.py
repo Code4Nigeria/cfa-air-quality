@@ -134,6 +134,7 @@ def input_sensor_data (request):
                         sensor_property.sensor_data_offset = offset #store the offest data into corresponding sensordetails space.
                         sensor_property.sensor_offset_date = datetime.now() # update the new time when sensor offset has been updated, usually ocuurs once perday.
                         #sensor_property.save() #save it. #uncomment this, only  when testing is over.
+                        break
 
 
                 #return HttpResponse ("the accurate datano is %s" %correct_data_no)
@@ -560,11 +561,143 @@ def output_sensors_details (request):
     sensor_details = SensorDetails.objects.all()
     return render (request, 'cfaairquality/displaydetails.html', {'sensor_details':sensor_details})
 
-def get_aqi_data (request, sensor_id):
-    #get the dateandtime, when request came in. get the aqi between
-    #start_time =
-    #get correct sensor from a list of sensors based oon the senor_id
-    sensor_aqi = activesensor[int(sensor_id)].objects.get()
+def get_aqi_data (request, sensor_id): #request AQI every hours and it will supply you, it will also supply nowcast used for predicting next hour AQI
+    #aqi is available in the following hours at 32 data_no i.e 8:00am in the moring for co2, starting from 12:00noon (PM nowcast) and prediction every hours
+    #aqi is available at 00.00midnight.
+    try:
+        sensor_select= activesensor[int(sensor_id)]
+    except:
+        return HttpResponse ("Sensor not Found")
+    now_time = datetime.now() #get as a data from url and convert to date time.('\d{4}[-/]\d{2}[-/]\d{2}')
+
+    try:
+        if request.method == "GET":
+            string_date =request.GET['d']
+            now_time = datetime.strptime(string_date, "%Y-%m-%d %H:%M:%S")
+            start_date = now_time
+
+
+    except:
+        start_date = now_time
+
+    sensor_aqi= 0
+    timelist = [15,30,45,60,115,130,145,160,215,230,245,260,315,330,345,360,415,430,445,460,515,530,545,560,615,630,645,660,715,730,745,
+            760,815,830,845,860,915,930,945,960,1015,1030,1045,1060,1115,1130,1145,1160,1215,1230,1245,1260,1315,1330,1345,1360,
+            1415,1430,1445,1460,1515,1530,1545,1560,1615,1630,1645,1660,1715,1730,1745,1760,1815,1830,1845,1860,1915,1930,1945,1960,
+            2015,2030,2045,2060,2115,2130,2145,2160,2215,2230,2245,2260,2315,2330,2345,2360]
+    #take time hrs and minuts and convert to string so you could check time
+    h=str(now_time.hour)
+    m=str(now_time.minute)
+
+    if len(h) == 1:
+        h=str('0'+h) # because the hr and min is output as a single digit, we append 0 to it to make it work the way we want
+    if len(m) == 1:
+        m=str('0'+m)
+    timedata = int(h+m) # we add up the string of hours and minutes to get something like HHMM like 1759
+
+    # Automatically find the hours of the day when request is coming and see if we have an AQI or NowCast
+    timetracker =1
+    for times in timelist:
+        if timedata > times:
+            timetracker = timetracker + 1
+        else:
+            if timetracker >=1 and timetracker < 32: #between the first 12:15 of new day, down to 8:00am
+                end_date =  start_date.date() #we made this first because after we edit startdate by adding 1, it doesnt allo us acess the date method inti.
+                start_date = start_date.date() - timedelta( days=1)  #date is always saved in UTC in database, so you need to do this to get correct figures
+                #end_date =  start_date.date() + timedelta( days=1)#will not include this date
+                timetracker = 96
+                try:
+                    sensor_aqi = sensor_select.objects.get(created_date__range=(start_date,end_date ), data_no =str(timetracker)) #the range check the date of the start date without adding the end date
+                except:
+                    return HttpResponse ("No AQI data found for this date")
+
+            elif timetracker > 32 and timetracker < 48: #between 8:00am and 12:00noon give them CO2 aqi.
+                start_date = start_date.date() #date is always saved in UTC in database, so you need to do this to get correct figures
+                end_date = start_date + timedelta( days=1 ) #will not include this date
+                timetracker = 32
+                try:
+                    sensor_aqi = sensor_select.objects.get(created_date__range=(start_date,end_date ), data_no =str(timetracker))
+                except:
+                    return HttpResponse ("No AQI data found for this date")
+
+            elif timetracker > 48 and timetracker < 96: #between 12noon and 12:00 am, give them nowcast, i.e nowcast as AQI for next hour and  AQI each next hour
+                start_date = start_date.date() #date is always saved in UTC in database, so you need to do this to get correct figures
+                end_date = start_date + timedelta( days=1 ) #will not include this date
+                timetracker = 4 * int (timetracker/4) #we need the hourly data here, irrespective of the timetracker.if this number is not divisible by four, deduct it to get to the number that is divisible by 4. That is the where the PMNowcast for this and next hour is located and AQI
+                try:
+                    sensor_aqi = sensor_select.objects.get(created_date__range=(start_date,end_date ), data_no =str(timetracker))
+                except:
+                    return HttpResponse ("No AQI data found for this date")
+            else:
+                pass
+
+            break
+
+    if sensor_aqi:
+        #return HttpResponse ("this is what i got %s" %sensor_aqi)
+        pass
+    else:
+        return HttpResponse ("No AQI data found for this date")
+
+    data= serializers.serialize("json", [sensor_aqi,])
+    data2=json.loads(data)
+    data=json.dumps(data2[0])
+    return HttpResponse(data, content_type="application/json")
+
+def get_last_ave (request, sensor_id): #Get the average of each pollutant data till this time.
+    #aqi is available in the following hours at 32 data_no i.e 8:00am in the moring for co2, starting from 12:00noon (PM nowcast) and prediction every hours
+    #aqi is available at 00.00midnight.
+    try:
+        sensor_select= activesensor[int(sensor_id)]
+    except:
+        return HttpResponse ("Sensor not Found")
+
+    now_time = datetime.now()
+
+    try:
+        if request.method == "GET":
+            string_date =request.GET['d']
+            now_time = datetime.strptime(string_date, "%Y-%m-%d %H:%M:%S")
+            start_date = now_time
+    except:
+        start_date = now_time
+
+    timelist = [15,30,45,60,115,130,145,160,215,230,245,260,315,330,345,360,415,430,445,460,515,530,545,560,615,630,645,660,715,730,745,
+            760,815,830,845,860,915,930,945,960,1015,1030,1045,1060,1115,1130,1145,1160,1215,1230,1245,1260,1315,1330,1345,1360,
+            1415,1430,1445,1460,1515,1530,1545,1560,1615,1630,1645,1660,1715,1730,1745,1760,1815,1830,1845,1860,1915,1930,1945,1960,
+            2015,2030,2045,2060,2115,2130,2145,2160,2215,2230,2245,2260,2315,2330,2345,2360]
+    #take time hrs and minuts and convert to string so you could check time
+    h=str(now_time.hour)
+    m=str(now_time.minute)
+
+    if len(h) == 1:
+        h=str('0'+h) # because the hr and min is output as a single digit, we append 0 to it to make it work the way we want
+    if len(m) == 1:
+        m=str('0'+m)
+    timedata = int(h+m) # we add up the string of hours and minutes to get something like HHMM like 1759
+    # Automatically find the hours of the day when request is coming and see if we have an AQI or NowCast
+    timetracker =1
+    for times in timelist:
+        if timedata > times:
+            timetracker = timetracker + 1
+        else:
+            try:
+                if timetracker == 1: # we are receiving request from a new data for average we are yet to have. then we report the average of the last data we got yesterday, i.e 96 and change the date to yesterday
+                    end_date = start_date.date() #date is always saved in UTC in database, so you need to do this to get correct figures
+                    start_date = start_date.date() - timedelta( days=1 )
+                    timetracker = 96
+                elif timetracker !=1:
+                    start_date = start_date.date() #date is always saved in UTC in database, so you need to do this to get correct figures
+                    end_date = start_date + timedelta( days=1 )
+                sensor_aqi = sensor_select.objects.get(created_date__range=(start_date,end_date ), data_no =str(timetracker))
+            except:
+                return HttpResponse ("No last avergae found")
+            break
+
+    if sensor_aqi:
+        pass
+    else:
+        return HttpResponse ("No data for this date, please try again")
     data= serializers.serialize("json", [sensor_aqi,])
     data2=json.loads(data)
     data=json.dumps(data2[0])
