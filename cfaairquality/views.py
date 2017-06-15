@@ -87,7 +87,7 @@ def input_sensor_data (request):
         except:
             return render (request, 'cfaairquality/sensorresponse.html', {})
 
-        if q['s'] == '12' or q['s'] == '50' : # i am debugging dont add the timing palava.
+        if q['s'] == '12' or q['s'] == '50' : # i am debugging dont add the timing palava. #this is set to 1 in the normaly working mode
 
             # we want to ensure the first data, data_no 1 starts at 00:00 to 00:15 on a particular day....................................................
             #sync data timing of sensor with that of database.
@@ -688,15 +688,12 @@ def get_last_ave (request, sensor_id): #Get the average of each pollutant data t
                     end_date = start_date.date() #date is always saved in UTC in database, so you need to do this to get correct figures
                     start_date = start_date.date() - timedelta( days=1 )
                     timetracker = 96
-                    return HttpResponse ("got1 here %s" %timetracker)
                 elif timetracker == 1: # we are receiving request today for average we have calulated
                     start_date = start_date.date() #date is always saved in UTC in database, so you need to do this to get correct figures
                     end_date = start_date + timedelta( days=1 )
-                    return HttpResponse ("got2 here %s" %timetracker)
                 elif timetracker !=1:
                     start_date = start_date.date() #date is always saved in UTC in database, so you need to do this to get correct figures
                     end_date = start_date + timedelta( days=1 )
-                    return HttpResponse ("got3 here %s" %timetracker)
                 sensor_aqi = sensor_select.objects.get(created_date__range=(start_date,end_date ), data_no =str(timetracker))
             except:
                 return HttpResponse ("No last avergae found")
